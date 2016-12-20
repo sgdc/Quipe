@@ -22,6 +22,7 @@ public class SwipeListener : MonoBehaviour {
 	private bool gameActive = false;
 	public UnityEngine.UI.Text notification; //do it the hacky way bc the better way stopped working arbitrarily
 	public UnityEngine.UI.Text cornerNotification;
+	public UnityEngine.UI.Text queueNotification;
 
 	List<string> swipes;
 	List<Player> users;
@@ -32,6 +33,10 @@ public class SwipeListener : MonoBehaviour {
 	string changing;
 
 	private string outputPath, userDatabasePath;
+
+	Player playingGame;
+
+	public GameObject spawner;
 
 	// Use this for initialization
 	void Start ()
@@ -83,6 +88,17 @@ public class SwipeListener : MonoBehaviour {
 		if (!gameActive && queuedPlayers.Count > 0) {
 			//another player is enqueued, gets to play
 			validSwipe(queuedPlayers.Dequeue());
+
+			string s = "Queued players: \n";
+			foreach (string x in queuedPlayers) {
+				Player p = findPlayerInDatabase(x);
+				if (p.score != -1)
+					s += p.name + "\n";
+				else {
+					s += x + "\n";
+				}
+			}
+			queueNotification.text = s;
 		}
 	}
 
@@ -118,7 +134,7 @@ public class SwipeListener : MonoBehaviour {
 				}
 
 				cornerNotification.text = "ID " + m.Substring(2, 8) + " swiped in successfully.";
-				cornerNotificationClear = seconds(2);
+				cornerNotificationClear = seconds(5);
 
 
 				// ENQUEUE IF GAMEACTIVE, ELSE EXECUTE IMMEDIATELY. UPDATE CHECKS IF !GAMEACTIVE AND SOMETHING IN QUEUE. IF SOMETHING IN QUEUE, RE-EXECUTE GAME IMMEDIATELY
@@ -126,6 +142,17 @@ public class SwipeListener : MonoBehaviour {
 					validSwipe(m);
 				else {
 					queuedPlayers.Enqueue(m);
+
+					string s = "Queued players: \n";
+					foreach (string x in queuedPlayers) {
+						Player p = findPlayerInDatabase(x);
+						if (p.score != -1)
+							s += p.name + "\n";
+						else {
+							s += x + "\n";
+						}
+					}
+					queueNotification.text = s;
 				}
 			}
 		}
@@ -155,18 +182,18 @@ public class SwipeListener : MonoBehaviour {
 			p.ID = m;
 			p.name = m.Substring(2, 8);
 			p.score = 0;
-			notif = "Welcome to Quipe! Your ID will be " + p.name + " and your current score is: 0";
+			notif = "Welcome to Quipe! Your ID will be " + p.name + ".";
 			users.Add(p);
 		} else {
-			p.score += 1; //todo: remove this
-			notif = "Welcome back, " + p.name + "! Your current score is: " + p.score.ToString();
+			notif = "Welcome back, " + p.name + "! Your score before today was: " + p.score.ToString();
 			updatePlayerInDatabase(p);
 		}
 
 
 		notification.text = notif;
 		notification.color = Color.green;
-		notificationClear = seconds (3f);
+		//notificationClear = seconds (4.75f);
+		notificationClear = -1;
 
 		saveDatabase();
 
@@ -226,6 +253,25 @@ public class SwipeListener : MonoBehaviour {
 	void ExecuteGame(Player p) {
 		//todo, game
 		gameActive = true;
-		endGame = seconds(5);
+		playingGame = p;
+
+		GameObject newBall = GameObject.Instantiate(spawner);
+		newBall.GetComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Dynamic;
+		newBall.GetComponent<CircleCollider2D>().isTrigger = false;
+		newBall.GetComponent<Rigidbody2D>().velocity = new Vector2(UnityEngine.Random.Range(-3, 4), 0);
+
+	}
+
+	public void ReceiveScore(int score) {
+		playingGame.score += score;
+
+		string s = "You scored " + score.ToString() + " points! Your total is now: " + playingGame.score.ToString() + "\nThanks for swiping in!";
+		notification.text = s;
+		notification.color = Color.green;
+
+		updatePlayerInDatabase(playingGame);
+
+		notificationClear = seconds(5);
+		endGame = seconds(3.25f);
 	}
 }
