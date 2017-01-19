@@ -4,7 +4,7 @@ using UnityEngine;
 using System;
 
 [Serializable]
-struct Player {
+public struct Player {
 	public int score;
 	public string name;
 	public string ID;
@@ -22,7 +22,8 @@ public class SwipeListener : MonoBehaviour {
 	private bool gameActive = false;
 	public UnityEngine.UI.Text notification; //do it the hacky way bc the better way stopped working arbitrarily
 	public UnityEngine.UI.Text cornerNotification;
-	public UnityEngine.UI.Text queueNotification;
+	public UnityEngine.UI.Text SwipeCount;
+	public UnityEngine.UI.Text UserDBSize;
 
 	List<string> swipes;
 	List<Player> users;
@@ -38,6 +39,10 @@ public class SwipeListener : MonoBehaviour {
 
 	public GameObject spawner;
 
+	bool spawnerMovingLeft = false;
+	float spawnerMoveCurrent = 0;
+	float spawnerMoveTotal = 1.4f;
+
 	// Use this for initialization
 	void Start ()
 	{
@@ -46,7 +51,7 @@ public class SwipeListener : MonoBehaviour {
 		inputField = (UnityEngine.UI.InputField)Canvas.FindObjectOfType<UnityEngine.UI.InputField> ();
 		//notification = (UnityEngine.UI.Text)Canvas.FindObjectOfType<UnityEngine.UI.Text>(); //this literally stopped working for no reason. idk.
 		currentID = "";
-		outputPath = @"C:\Users\Adam\Desktop\";
+		outputPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\";
 		outputPath += DateTime.Now.ToString ("MM-dd-yyyy");
 		outputPath += " Quipe Log.txt";
 		if (System.IO.File.Exists (outputPath)) {
@@ -59,12 +64,13 @@ public class SwipeListener : MonoBehaviour {
 				swipes.Add (line);
 			}
 			file.Close ();
+			SwipeCount.text = "Swipes: " + swipes.Count.ToString();
 		} else { 
 			System.IO.File.WriteAllText (outputPath, ""); //ensures file exists and is empty
 		}
 
 		users = new List<Player> ();
-		userDatabasePath = @"C:\Users\Adam\Desktop\QuipeUsers.data";
+		userDatabasePath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\QuipeUsers.data";
 
 		if (System.IO.File.Exists (userDatabasePath)) {
 			using (var file = System.IO.File.OpenRead(userDatabasePath))
@@ -72,34 +78,97 @@ public class SwipeListener : MonoBehaviour {
 				var reader = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter ();
 			    users = (List<Player>) reader.Deserialize(file); // Reads the entire list.
 			}
+
+			UserDBSize.text = "User Database Size: " + users.Count.ToString();
 		}
 
 
 	}
 	
 	// Update is called once per frame
-	void Update () {
+	void Update ()
+	{
 		//Give input field constant focus (this ensures we are listening for input always)
-		UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(inputField.gameObject, null);
-		inputField.OnPointerClick(new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current));
+		UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject (inputField.gameObject, null);
+		inputField.OnPointerClick (new UnityEngine.EventSystems.PointerEventData (UnityEngine.EventSystems.EventSystem.current));
 
-		alarms();
 
-		if (!gameActive && queuedPlayers.Count > 0) {
-			//another player is enqueued, gets to play
-			validSwipe(queuedPlayers.Dequeue());
+		if (Input.GetKeyDown (KeyCode.CapsLock)) { //export IDs to AHK file
+			string ahkPath = Environment.GetFolderPath (Environment.SpecialFolder.Desktop) + @"\";
+			ahkPath += DateTime.Now.ToString ("MM-dd-yyyy");
+			ahkPath += " Quipe.ahk";
 
-			string s = "Queued players: \n";
-			foreach (string x in queuedPlayers) {
-				Player p = findPlayerInDatabase(x);
-				if (p.score != -1)
-					s += p.name + "\n";
-				else {
-					s += x + "\n";
+			System.IO.File.WriteAllText (ahkPath, ""); //ensures file exists and is blank
+
+			using (System.IO.StreamWriter file = new System.IO.StreamWriter (ahkPath, true)) {
+				file.WriteLine ("Home::");
+				foreach (string m in swipes) {
+					file.WriteLine ("\tSendRaw, `" + m);
+					file.WriteLine ("\tSend, {Return}");
+					file.WriteLine ("\tKeyWait, CapsLock, D");
+				}
+				file.WriteLine ("Return");
+
+			}
+
+			notification.text = "Swipes exported to AHK.";
+			notification.color = Color.blue;
+			notificationClear = 60;
+		}
+
+		if (Input.GetKeyDown (KeyCode.LeftControl)) {
+			string leaderboardPath = Environment.GetFolderPath (Environment.SpecialFolder.Desktop) + @"\";
+			leaderboardPath += DateTime.Now.ToString ("MM-dd-yyyy");
+			leaderboardPath += " Scores.csv";
+
+			System.IO.File.WriteAllText (leaderboardPath, ""); //ensure file exists and is empty
+
+			users.Sort((s1, s2) => s2.score.CompareTo(s1.score));
+
+			using (System.IO.StreamWriter file = new System.IO.StreamWriter (leaderboardPath, true)) {
+				file.WriteLine("Name, Score");
+				file.WriteLine();
+				foreach (Player p in users) {
+					file.WriteLine(p.name + ", " + p.score.ToString());
 				}
 			}
-			queueNotification.text = s;
+
+			notification.text = "Leaderboard exported to text.";
+			notification.color = Color.blue;
+			notificationClear = 60;
+
 		}
+
+		if (Input.GetKeyDown(KeyCode.Tab) && Application.isEditor) {
+			swipes.Clear();
+			notification.text = "Clearing instance swipe list. Cheater.";
+			notification.color = Color.blue;
+			notificationClear = 60;
+		}
+
+
+		alarms();
+		moveSpawner();
+
+
+	}
+
+	void moveSpawner() {
+			spawner.transform.position = new Vector2(Mathf.Lerp(-10f, 10f, spawnerMoveCurrent / spawnerMoveTotal), spawner.transform.position.y);
+			if (spawnerMovingLeft) {
+				spawnerMoveCurrent += Time.deltaTime;
+				if (spawnerMoveCurrent >= spawnerMoveTotal)
+				{
+					spawnerMoveCurrent = spawnerMoveTotal;
+					spawnerMovingLeft = false;
+				}
+			} else {
+				spawnerMoveCurrent -= Time.deltaTime;
+				if (spawnerMoveCurrent <= 0) {
+					spawnerMoveCurrent = 0;
+					spawnerMovingLeft = true;
+				}
+			}
 	}
 
 	void SendMessage (string m)
@@ -108,26 +177,33 @@ public class SwipeListener : MonoBehaviour {
 		TextMesh t = GetComponent<TextMesh> ();
 
 		if (changingPlayer) {
-			if (changing.Equals("name")){
+			if (changing.Equals ("name")) {
 				playerToChange.name = m;
-				notification.text = "Awesome. The name for this card is now " + playerToChange.name + ".";
+				notification.text = "The name for this card is now " + playerToChange.name + ".";
 				notification.color = Color.green;
-				notificationClear = seconds(2.5f);
+				notificationClear = seconds (2.5f);
 
-				updatePlayerInDatabase(playerToChange);
+				updatePlayerInDatabase (playerToChange);
 				changing = "";
 				changingPlayer = false;
 			}
-		}
-		else if ((m.StartsWith("%") || m.StartsWith(";")) && m.EndsWith ("?") && !m.EndsWith ("E?") && m.Length >= 12) { //ID starts with ; or %, ends with a ?, but doesn't end with an E?, which is an error
+		} else if ((m.StartsWith ("%") || m.StartsWith (";")) && m.EndsWith ("?") && !m.EndsWith ("E?") && m.Length >= 12) { //ID starts with ; or %, ends with a ?, but doesn't end with an E?, which is an error
 			if (swipes.Contains (m)) {
 				//user already swiped in
-				notification.text = "ID " + m.Substring (2, 8) + ", you already swiped in.";
-				notification.color = Color.black;
-				notificationClear = seconds (2.5f);
+				Player p = findPlayerInDatabase (m);
+				if (p.score > -1) {
+					notification.text = p.name + ", you already swiped in.\n\nYour current score is: " + p.score.ToString();
+					notification.color = Color.black;
+					notificationClear = seconds (2.5f);
+				} else {
+					notification.text = "ID " + m.Substring (2, 8) + ", you already swiped in.";
+					notification.color = Color.black;
+					notificationClear = seconds (2.5f);
+				}
 			} else {
 				//add to swipes list
 				swipes.Add (m);
+				SwipeCount.text = "Swipes: " + swipes.Count.ToString();
 
 				using (System.IO.StreamWriter file = new System.IO.StreamWriter (outputPath, true)) {
 					file.WriteLine (m); //write swipes to output file
@@ -136,24 +212,8 @@ public class SwipeListener : MonoBehaviour {
 				cornerNotification.text = "ID " + m.Substring(2, 8) + " swiped in successfully.";
 				cornerNotificationClear = seconds(5);
 
+				validSwipe(m);
 
-				// ENQUEUE IF GAMEACTIVE, ELSE EXECUTE IMMEDIATELY. UPDATE CHECKS IF !GAMEACTIVE AND SOMETHING IN QUEUE. IF SOMETHING IN QUEUE, RE-EXECUTE GAME IMMEDIATELY
-				if (!gameActive)
-					validSwipe(m);
-				else {
-					queuedPlayers.Enqueue(m);
-
-					string s = "Queued players: \n";
-					foreach (string x in queuedPlayers) {
-						Player p = findPlayerInDatabase(x);
-						if (p.score != -1)
-							s += p.name + "\n";
-						else {
-							s += x + "\n";
-						}
-					}
-					queueNotification.text = s;
-				}
 			}
 		}
 		else if (m.StartsWith("n") && m.EndsWith ("?") && !m.EndsWith ("E?") && m.Length >= 12 && findPlayerInDatabase(m.Substring(1)).score != -1)//valid ID starting with n, name update
@@ -168,7 +228,7 @@ public class SwipeListener : MonoBehaviour {
 		}
 		else {
 			notification.text = "Swipe did not read successfully.";
-			notification.color = Color.grey;
+			notification.color = Color.black;
 			notificationClear = seconds(2.5f);
 		}
 	}
@@ -189,10 +249,11 @@ public class SwipeListener : MonoBehaviour {
 			updatePlayerInDatabase(p);
 		}
 
+		UserDBSize.text = "User Database Size: " + users.Count.ToString();
+
 
 		notification.text = notif;
 		notification.color = Color.green;
-		//notificationClear = seconds (4.75f);
 		notificationClear = -1;
 
 		saveDatabase();
@@ -246,30 +307,26 @@ public class SwipeListener : MonoBehaviour {
 			notification.text = ""; //clear notification text
 		if (cornerNotificationClear == 0)
 			cornerNotification.text = "";
-		if (endGame == 0)
-			gameActive = false;
 	}
 
 	void ExecuteGame(Player p) {
-		//todo, game
-		gameActive = true;
-		playingGame = p;
-
 		GameObject newBall = GameObject.Instantiate(spawner);
 		newBall.GetComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Dynamic;
 		newBall.GetComponent<CircleCollider2D>().isTrigger = false;
-		newBall.GetComponent<Rigidbody2D>().velocity = new Vector2(UnityEngine.Random.Range(-3, 4), 0);
+		newBall.GetComponent<Rigidbody2D>().velocity = new Vector2(UnityEngine.Random.Range(-0.5f, 0.5f), 0);
+		newBall.GetComponent<BallController>().p = p;
+		newBall.GetComponent<SpriteRenderer>().color = new Color(UnityEngine.Random.value, UnityEngine.Random.value, UnityEngine.Random.value);
 
 	}
 
-	public void ReceiveScore(int score) {
-		playingGame.score += score;
+	public void ReceiveScore(Player p, int score) {
+		p.score += score;
 
-		string s = "You scored " + score.ToString() + " points! Your total is now: " + playingGame.score.ToString() + "\nThanks for swiping in!";
+		string s = p.name + " scored " + score.ToString() + " points! Their total is now: " + p.score.ToString() + "\nThanks for swiping in!";
 		notification.text = s;
 		notification.color = Color.green;
 
-		updatePlayerInDatabase(playingGame);
+		updatePlayerInDatabase(p);
 
 		notificationClear = seconds(5);
 		endGame = seconds(3.25f);

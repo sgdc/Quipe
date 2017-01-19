@@ -18,7 +18,7 @@ public class pachinkoController : MonoBehaviour {
 
 	void OnTriggerEnter2D (Collider2D c) {
 		SwipeListener s = GameObject.FindGameObjectWithTag("Player").GetComponent<SwipeListener>();
-		s.ReceiveScore(score);
+		s.ReceiveScore(c.GetComponent<BallController>().p, score);
 		toDestroy = c.gameObject;
 		StartCoroutine(destroyObject(1.5f));
 	}
