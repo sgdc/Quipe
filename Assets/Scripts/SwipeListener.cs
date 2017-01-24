@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using System;
 
 [Serializable]
@@ -29,6 +30,8 @@ public class SwipeListener : MonoBehaviour {
 	List<Player> users;
 	Queue<string> queuedPlayers;
 
+	bool loadingData = true;
+
 	bool changingPlayer = false;
 	bool listeningForNameChange = false;
 	Player playerToChange;
@@ -38,7 +41,7 @@ public class SwipeListener : MonoBehaviour {
 
 	Player playingGame;
 
-	public GameObject spawner;
+	GameObject spawner;
 
 	bool spawnerMovingLeft = false;
 	float spawnerMoveCurrent = 0;
@@ -47,9 +50,17 @@ public class SwipeListener : MonoBehaviour {
 	// Use this for initialization
 	void Start ()
 	{
+		inputField = (UnityEngine.UI.InputField)Canvas.FindObjectOfType<UnityEngine.UI.InputField> ();
+		spawner = GameObject.FindGameObjectWithTag("Spawner");
+		notification.text = "Type the name of the .data file to load. (Without .data, so to load x.data, type x)";
+		notification.color = Color.black;
+	}
+
+	void loadData(string filename) {
+		filename += ".data";
 		swipes = new List<string> ();
 		queuedPlayers = new Queue<string>();
-		inputField = (UnityEngine.UI.InputField)Canvas.FindObjectOfType<UnityEngine.UI.InputField> ();
+
 		//notification = (UnityEngine.UI.Text)Canvas.FindObjectOfType<UnityEngine.UI.Text>(); //this literally stopped working for no reason. idk.
 		currentID = "";
 		outputPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\Quipe\";
@@ -71,7 +82,7 @@ public class SwipeListener : MonoBehaviour {
 		}
 
 		users = new List<Player> ();
-		userDatabasePath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\Quipe\QuipeUsers.data";
+		userDatabasePath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\Quipe\" + filename;
 
 		if (System.IO.File.Exists (userDatabasePath)) {
 			using (var file = System.IO.File.OpenRead(userDatabasePath))
@@ -81,11 +92,17 @@ public class SwipeListener : MonoBehaviour {
 			}
 
 			UserDBSize.text = "User Database Size: " + users.Count.ToString();
+
+			notification.text = "Loaded data from " + filename + " -- " + users.Count.ToString() + " users were loaded.";
+		} else {
+			System.IO.File.WriteAllText (userDatabasePath, "");
+			notification.text = "Database not found, created new database " + filename + " -- 0 users were loaded.";
 		}
 
-
+		notification.color = Color.black;
+		notificationClear = 300;
 	}
-	
+
 	// Update is called once per frame
 	void Update ()
 	{
@@ -185,7 +202,14 @@ public class SwipeListener : MonoBehaviour {
 				notification.color = Color.black;
 				notificationClear = 90;
 			}
+		}
 
+		if (Input.GetKeyDown(KeyCode.KeypadEnter)) {
+			SceneManager.LoadScene((SceneManager.GetActiveScene().buildIndex + 1) % SceneManager.sceneCountInBuildSettings);
+		}
+
+		if (Input.GetKeyDown(KeyCode.BackQuote)) {
+			inputField.GetComponent<UnityEngine.UI.Text>().color = new Color(0, 0, 0, 1 - inputField.GetComponent<UnityEngine.UI.Text>().color.a);
 		}
 
 
@@ -216,6 +240,17 @@ public class SwipeListener : MonoBehaviour {
 	void SendMessage (string m)
 	{
 		inputField.text = ""; //clear input field, prevents double swipes
+
+		if (loadingData && m != "" && m != "b") { //LOAD DATA
+			try {
+				loadData(m);
+				loadingData = false;
+				return;
+			} catch {
+				return;
+			}
+		}
+
 		TextMesh t = GetComponent<TextMesh> ();
 
 		if (m == "b") {
@@ -265,7 +300,7 @@ public class SwipeListener : MonoBehaviour {
 					file.WriteLine (m); //write swipes to output file
 				}
 
-				cornerNotification.text = "ID " + m.Substring(2, 8) + " swiped in successfully.";
+				cornerNotification.text = "ID " + m.Substring(2, 3) + "***** swiped in successfully.";
 				cornerNotificationClear = seconds(5);
 
 				validSwipe(m);
