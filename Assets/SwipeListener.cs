@@ -30,6 +30,7 @@ public class SwipeListener : MonoBehaviour {
 	Queue<string> queuedPlayers;
 
 	bool changingPlayer = false;
+	bool listeningForNameChange = false;
 	Player playerToChange;
 	string changing;
 
@@ -51,7 +52,7 @@ public class SwipeListener : MonoBehaviour {
 		inputField = (UnityEngine.UI.InputField)Canvas.FindObjectOfType<UnityEngine.UI.InputField> ();
 		//notification = (UnityEngine.UI.Text)Canvas.FindObjectOfType<UnityEngine.UI.Text>(); //this literally stopped working for no reason. idk.
 		currentID = "";
-		outputPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\";
+		outputPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\Quipe\";
 		outputPath += DateTime.Now.ToString ("MM-dd-yyyy");
 		outputPath += " Quipe Log.txt";
 		if (System.IO.File.Exists (outputPath)) {
@@ -70,7 +71,7 @@ public class SwipeListener : MonoBehaviour {
 		}
 
 		users = new List<Player> ();
-		userDatabasePath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\QuipeUsers.data";
+		userDatabasePath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\Quipe\QuipeUsers.data";
 
 		if (System.IO.File.Exists (userDatabasePath)) {
 			using (var file = System.IO.File.OpenRead(userDatabasePath))
@@ -94,7 +95,7 @@ public class SwipeListener : MonoBehaviour {
 
 
 		if (Input.GetKeyDown (KeyCode.CapsLock)) { //export IDs to AHK file
-			string ahkPath = Environment.GetFolderPath (Environment.SpecialFolder.Desktop) + @"\";
+			string ahkPath = Environment.GetFolderPath (Environment.SpecialFolder.Desktop) + @"\Quipe\";
 			ahkPath += DateTime.Now.ToString ("MM-dd-yyyy");
 			ahkPath += " Quipe.ahk";
 
@@ -117,33 +118,74 @@ public class SwipeListener : MonoBehaviour {
 		}
 
 		if (Input.GetKeyDown (KeyCode.LeftControl)) {
-			string leaderboardPath = Environment.GetFolderPath (Environment.SpecialFolder.Desktop) + @"\";
+			string leaderboardPath = Environment.GetFolderPath (Environment.SpecialFolder.Desktop) + @"\Quipe\";
 			leaderboardPath += DateTime.Now.ToString ("MM-dd-yyyy");
 			leaderboardPath += " Scores.csv";
 
 			System.IO.File.WriteAllText (leaderboardPath, ""); //ensure file exists and is empty
 
-			users.Sort((s1, s2) => s2.score.CompareTo(s1.score));
+			users.Sort ((s1, s2) => s2.score.CompareTo (s1.score));
 
 			using (System.IO.StreamWriter file = new System.IO.StreamWriter (leaderboardPath, true)) {
-				file.WriteLine("Name, Score");
-				file.WriteLine();
+				file.WriteLine ("Name, Score");
+				file.WriteLine ();
 				foreach (Player p in users) {
-					file.WriteLine(p.name + ", " + p.score.ToString());
+					file.WriteLine (p.name + ", " + p.score.ToString ());
 				}
 			}
 
 			notification.text = "Leaderboard exported to text.";
 			notification.color = Color.blue;
 			notificationClear = 60;
-
 		}
 
-		if (Input.GetKeyDown(KeyCode.Tab) && Application.isEditor) {
-			swipes.Clear();
+		if (Input.GetKeyDown (KeyCode.Tab) && Application.isEditor) {
+			swipes.Clear ();
 			notification.text = "Clearing instance swipe list. Cheater.";
 			notification.color = Color.blue;
 			notificationClear = 60;
+		}
+
+		if (Input.GetKeyDown (KeyCode.RightControl)) {
+			listeningForNameChange = true;
+			notification.text = "Swipe card whose name you want to change.";
+			notification.color = Color.blue;
+			notificationClear = 90;
+		}
+
+		if (Input.GetKeyDown (KeyCode.KeypadPlus)) {
+			//READS FROM names.txt FORMATTED firstName \t lastName \t ID
+			string namesPath = Environment.GetFolderPath (Environment.SpecialFolder.Desktop) + @"\Quipe\names.txt";
+			if (System.IO.File.Exists (namesPath)) {
+				string line;
+				string[] parts;
+
+				// Read the file line by line.
+				System.IO.StreamReader file = 
+					new System.IO.StreamReader (namesPath);
+				while ((line = file.ReadLine ()) != null) {
+					char[] stupid = new char[1];
+					stupid[0] = '\t';
+					parts = line.Split(stupid);
+
+					Player toUpdate = findPlayerInDatabaseByName(parts[2]); //2 is their 8 digit Stevens ID, which is their name in the database by default
+					toUpdate.name = parts[0] + " " + parts[1];
+					updatePlayerInDatabase(toUpdate);
+				}
+
+
+				file.Close ();
+				saveDatabase();
+
+				notification.text = "Names reconciled with names.txt";
+				notification.color = Color.blue;
+				notificationClear = 90;
+			} else {
+				notification.text = "names.txt not found. Please format a names.txt in the format firstName lastName ID";
+				notification.color = Color.black;
+				notificationClear = 90;
+			}
+
 		}
 
 
@@ -176,7 +218,12 @@ public class SwipeListener : MonoBehaviour {
 		inputField.text = ""; //clear input field, prevents double swipes
 		TextMesh t = GetComponent<TextMesh> ();
 
-		if (changingPlayer) {
+		if (m == "b") {
+			Player fake = new Player();
+			fake.score = -1;
+			ExecuteGame(fake);
+		}
+		else if (changingPlayer) {
 			if (changing.Equals ("name")) {
 				playerToChange.name = m;
 				notification.text = "The name for this card is now " + playerToChange.name + ".";
@@ -192,9 +239,18 @@ public class SwipeListener : MonoBehaviour {
 				//user already swiped in
 				Player p = findPlayerInDatabase (m);
 				if (p.score > -1) {
-					notification.text = p.name + ", you already swiped in.\n\nYour current score is: " + p.score.ToString();
-					notification.color = Color.black;
-					notificationClear = seconds (2.5f);
+					if (listeningForNameChange) {
+						playerToChange = p;
+						changingPlayer = true;
+						changing = "name";
+						notification.text = "Type a new name for account " + p.name + ".";
+						notification.color = Color.green;
+						notificationClear = seconds (2);
+					} else {
+						notification.text = p.name + ", you already swiped in.\n\nYour current score is: " + p.score.ToString ();
+						notification.color = Color.black;
+						notificationClear = seconds (2.5f);
+					}
 				} else {
 					notification.text = "ID " + m.Substring (2, 8) + ", you already swiped in.";
 					notification.color = Color.black;
@@ -216,21 +272,14 @@ public class SwipeListener : MonoBehaviour {
 
 			}
 		}
-		else if (m.StartsWith("n") && m.EndsWith ("?") && !m.EndsWith ("E?") && m.Length >= 12 && findPlayerInDatabase(m.Substring(1)).score != -1)//valid ID starting with n, name update
-		{
-			Player p = findPlayerInDatabase(m.Substring(1));
-			playerToChange = p;
-			changingPlayer = true;
-			changing = "name";
-			notification.text = "Type a new name for account " + p.name + ".";
-			notification.color = Color.green;
-			notificationClear = seconds(2);
-		}
 		else {
+			Debug.Log(m);
 			notification.text = "Swipe did not read successfully.";
 			notification.color = Color.black;
 			notificationClear = seconds(2.5f);
 		}
+
+		listeningForNameChange = false;
 	}
 
 	void validSwipe(string m) {
@@ -284,6 +333,16 @@ public class SwipeListener : MonoBehaviour {
 		return ret;
 	}
 
+	Player findPlayerInDatabaseByName(string name) {
+		Player ret = new Player();
+		ret.score = -1;
+		foreach(Player p in users) {
+			if (p.name == name)
+				ret = p;
+		}
+		return ret;
+	}
+
 	void updatePlayerInDatabase(Player n) {
 		Player toUpdate = users.Find(x => x.ID == n.ID);
 		users.Remove(toUpdate);
@@ -319,16 +378,19 @@ public class SwipeListener : MonoBehaviour {
 
 	}
 
-	public void ReceiveScore(Player p, int score) {
-		p.score += score;
+	public void ReceiveScore (Player p, int score)
+	{
+		if (p.score > -1) {
+			p.score += score;
 
-		string s = p.name + " scored " + score.ToString() + " points! Their total is now: " + p.score.ToString() + "\nThanks for swiping in!";
-		notification.text = s;
-		notification.color = Color.green;
+			string s = p.name + " scored " + score.ToString () + " points! Their total is now: " + p.score.ToString () + "\nThanks for swiping in!";
+			notification.text = s;
+			notification.color = Color.green;
 
-		updatePlayerInDatabase(p);
+			updatePlayerInDatabase (p);
 
-		notificationClear = seconds(5);
-		endGame = seconds(3.25f);
+			notificationClear = seconds (5);
+			endGame = seconds (3.25f);
+		}
 	}
 }
