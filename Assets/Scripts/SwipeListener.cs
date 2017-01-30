@@ -25,6 +25,7 @@ public class SwipeListener : MonoBehaviour {
 	public UnityEngine.UI.Text cornerNotification;
 	public UnityEngine.UI.Text SwipeCount;
 	public UnityEngine.UI.Text UserDBSize;
+	public UnityEngine.UI.Text leaders;
 
 	List<string> swipes;
 	List<Player> users;
@@ -57,7 +58,7 @@ public class SwipeListener : MonoBehaviour {
 	}
 
 	void loadData(string filename) {
-		filename += ".data";
+		filename = filename.ToLower() + ".data";
 		swipes = new List<string> ();
 		queuedPlayers = new Queue<string>();
 
@@ -94,6 +95,12 @@ public class SwipeListener : MonoBehaviour {
 			UserDBSize.text = "User Database Size: " + users.Count.ToString();
 
 			notification.text = "Loaded data from " + filename + " -- " + users.Count.ToString() + " users were loaded.";
+
+			string leaderText = "Top 5:";
+			users.Sort ((s1, s2) => s2.score.CompareTo (s1.score));
+			for (int i = 0; i < 5; i++)
+				leaderText += "\n" + users[i].name + ": " + users[i].score;
+			leaders.text = leaderText;
 		} else {
 			System.IO.File.WriteAllText (userDatabasePath, "");
 			notification.text = "Database not found, created new database " + filename + " -- 0 users were loaded.";
@@ -147,7 +154,8 @@ public class SwipeListener : MonoBehaviour {
 				file.WriteLine ("Name, Score");
 				file.WriteLine ();
 				foreach (Player p in users) {
-					file.WriteLine (p.name + ", " + p.score.ToString ());
+					Player reading = findPlayerInDatabase(p.ID);
+					file.WriteLine (reading.name + ", " + reading.score.ToString ());
 				}
 			}
 
@@ -378,6 +386,13 @@ public class SwipeListener : MonoBehaviour {
 		return ret;
 	}
 
+	void removePlayerInDatabase(Player n) {
+		Player toRemove = users.Find(x => (x.ID == n.ID && x.name == n.name));
+		users.Remove(toRemove);
+		saveDatabase();
+
+	}
+
 	void updatePlayerInDatabase(Player n) {
 		Player toUpdate = users.Find(x => x.ID == n.ID);
 		users.Remove(toUpdate);
@@ -407,7 +422,7 @@ public class SwipeListener : MonoBehaviour {
 		GameObject newBall = GameObject.Instantiate(spawner);
 		newBall.GetComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Dynamic;
 		newBall.GetComponent<CircleCollider2D>().isTrigger = false;
-		newBall.GetComponent<Rigidbody2D>().velocity = new Vector2(UnityEngine.Random.Range(-0.5f, 0.5f), 0);
+		//newBall.GetComponent<Rigidbody2D>().velocity = new Vector2(UnityEngine.Random.Range(-0.5f, 0.5f), 0); //randomness is removed
 		newBall.GetComponent<BallController>().p = p;
 		newBall.GetComponent<SpriteRenderer>().color = new Color(UnityEngine.Random.value, UnityEngine.Random.value, UnityEngine.Random.value);
 
