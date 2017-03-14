@@ -14,13 +14,20 @@ Press the left control key at any time to export a leaderboard. If names haven't
 There are two ways to change a user's name. First is to press Right CTRL, then have them swipe their ID. They can then type their name and press enter, which will overwrite their display name for log in and leaderboards.
 
 Alternatively, pressing Numpad + searches for a file called names.txt in your /Quipe/ folder on your Desktop. This file is in the format: 
-FirstName	LastName	ID
-FirstName	LastName	ID
+
 FirstName	LastName	ID
 
+FirstName	LastName	ID
+
+FirstName	LastName	ID
+
+
 ie:
+
 Adam Gincel 11122333
+
 Alex Massenzio 99988777
+
 
 Pressing Numpad + will iterate through that file, searching for users with the IDs on the right, and changing their name to the First and Last names given. Use Ducksync to export participation and format the file accordingly.
 
