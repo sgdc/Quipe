@@ -20,7 +20,11 @@ public class pachinkoController : MonoBehaviour {
 		SwipeListener s = GameObject.FindGameObjectWithTag("Player").GetComponent<SwipeListener>();
 		s.ReceiveScore(c.GetComponent<BallController>().p, score);
 		toDestroy = c.gameObject;
-		StartCoroutine(destroyObject(1.5f));
+
+		if (c.GetComponent<BallController>().p.score == -1)
+			Destroy(c.gameObject);
+		else
+			StartCoroutine(destroyObject(1.5f));
 	}
 
 	IEnumerator destroyObject(float t) {

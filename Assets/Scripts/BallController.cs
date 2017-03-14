@@ -29,13 +29,13 @@ public class BallController : MonoBehaviour {
 	{
 		timeAlive += Time.deltaTime;
 
-		if (timeAlive > 20f && p.score == -1) {
+		/*if (timeAlive > 20f && p.score == -1) {
 			Color temp = new Color(startColor.r, startColor.g, startColor.b, Mathf.Lerp(1, 0, (timeAlive - 20) / 2));
 			this.GetComponent<SpriteRenderer>().color = temp;
 			if (timeAlive > 22f)
 				GameObject.Destroy(this.gameObject);
 		} else {
 			startColor = this.GetComponent<SpriteRenderer>().color;
-		}
+		}*/
 	}
 }

@@ -96,11 +96,7 @@ public class SwipeListener : MonoBehaviour {
 
 			notification.text = "Loaded data from " + filename + " -- " + users.Count.ToString() + " users were loaded.";
 
-			string leaderText = "Top 5:";
-			users.Sort ((s1, s2) => s2.score.CompareTo (s1.score));
-			for (int i = 0; i < 5; i++)
-				leaderText += "\n" + users[i].name + ": " + users[i].score;
-			leaders.text = leaderText;
+			updateLeaderboard();
 		} else {
 			System.IO.File.WriteAllText (userDatabasePath, "");
 			notification.text = "Database not found, created new database " + filename + " -- 0 users were loaded.";
@@ -108,6 +104,14 @@ public class SwipeListener : MonoBehaviour {
 
 		notification.color = Color.black;
 		notificationClear = 300;
+	}
+
+	void updateLeaderboard() {
+		string leaderText = "Top 5:";
+		users.Sort ((s1, s2) => s2.score.CompareTo (s1.score));
+		for (int i = 0; i < 5; i++)
+			leaderText += "\n" + users[i].name + ": " + users[i].score;
+		leaders.text = leaderText;
 	}
 
 	// Update is called once per frame
@@ -441,6 +445,8 @@ public class SwipeListener : MonoBehaviour {
 
 			notificationClear = seconds (5);
 			endGame = seconds (3.25f);
+
+			updateLeaderboard();
 		}
 	}
 }
